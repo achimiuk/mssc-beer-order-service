@@ -13,6 +13,7 @@ import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.support.StateMachineInterceptorAdapter;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -34,7 +35,7 @@ public class BeerOrderStateChangeInterceptor extends StateMachineInterceptorAdap
         log.debug("Pre-State Change");
 
         Optional.ofNullable(message)
-                .flatMap(msg -> Optional.ofNullable((String) msg.getHeaders().getOrDefault(BeerOrderManagerImpl.ORDER_ID_HEADER, " ")))
+                .flatMap(msg -> Optional.ofNullable((String) msg.getHeaders().get(BeerOrderManagerImpl.ORDER_ID_HEADER)))
                 .ifPresent(orderId -> {
                     log.debug("Saving state for order id: " + orderId + " Status: " + state.getId());
 

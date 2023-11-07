@@ -16,6 +16,7 @@ import org.springframework.statemachine.support.DefaultStateMachineContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.persistence.EntityManager;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,6 +34,8 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
     private final BeerOrderRepository beerOrderRepository;
     private final BeerOrderStateChangeInterceptor beerOrderStateChangeInterceptor;
 
+    private final EntityManager entityManager;
+
     @Transactional
     @Override
     public BeerOrder newBeerOrder(BeerOrder beerOrder) {
@@ -40,8 +43,13 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
         beerOrder.setOrderStatus(BeerOrderStatusEnum.NEW);
 
         BeerOrder savedBeerOrder = beerOrderRepository.saveAndFlush(beerOrder);
-        sendBeerOrderEvent(savedBeerOrder, BeerOrderEventEnum.VALIDATE_ORDER);
+//        sendBeerOrderEvent(savedBeerOrder, BeerOrderEventEnum.VALIDATE_ORDER);
         return savedBeerOrder;
+    }
+
+    @Override
+    public void validateBeerOrder(BeerOrder beerOrder) {
+        sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.VALIDATE_ORDER);
     }
 
     @Transactional
@@ -54,7 +62,7 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
         beerOrderOptional.ifPresentOrElse(beerOrder -> {
             if(isValid){
                 sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.VALIDATION_PASSED);
-
+                entityManager.refresh(beerOrder);
                 BeerOrder validatedOrder = beerOrderRepository.findById(beerOrderId).get();
 
                 sendBeerOrderEvent(validatedOrder, BeerOrderEventEnum.ALLOCATE_ORDER);
@@ -122,6 +130,17 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
             //do process
             sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.BEERORDER_PICKED_UP);
         }, () -> log.error("Order Not Found. Id: " + id));
+    }
+
+    @Override
+    public void beerOrderCanceled(UUID orderId) {
+        Optional<BeerOrder> beerOrderOptional = beerOrderRepository.findById(orderId);
+
+        beerOrderOptional.ifPresentOrElse(beerOrder -> {
+            //do process
+            sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.CANCEL_ORDER);
+        }, () -> log.error("Order Not Found. Id: " + orderId));
+
     }
 
     private void sendBeerOrderEvent(BeerOrder beerOrder, BeerOrderEventEnum eventEnum){
